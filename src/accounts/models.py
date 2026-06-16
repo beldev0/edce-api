@@ -1,6 +1,9 @@
 from django.db import models
 from django.contrib.auth.models import PermissionsMixin, AbstractBaseUser, BaseUserManager
 from django.conf import settings
+from uuid import uuid4
+from django.utils import timezone
+
 
 # Create your models here.
 class CustomManager(BaseUserManager) :
@@ -21,6 +24,7 @@ class CustomManager(BaseUserManager) :
         user = self.create_user(email,password, **extra_fields)
 
 class User(AbstractBaseUser, PermissionsMixin) :
+    id           = models.UUIDField(default=uuid4, primary_key=True, editable=False)
     username     = None
     created_at   = models.DateTimeField(auto_now_add=True)
     status       = models.CharField(max_length=12, choices=[('teacher', 'teacher'), ('moderator', 'moderator'), ('admin', 'admin')], default='teacher')
@@ -40,7 +44,18 @@ class User(AbstractBaseUser, PermissionsMixin) :
 class UserProfil(models.Model) :
     last_name  = models.CharField(max_length=30, blank=True)
     first_name = models.CharField(max_length=30, blank=True)
-    birth_date = models.DateField(blank=True)
+    birth_date = models.DateField(blank=True, null=True)
     quarter    = models.CharField(max_length=30, blank=True)
     sexe       = models.CharField(max_length=12, choices=[('MASCULIN', 'MASCULIN'), ('FEMININ', 'FEMININ')], blank=True)
     tel        = models.CharField(max_length=15, blank=True)
+    user       = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='profil')
+
+
+class AccountVerificationCode(models.Model) :
+    created_at = models.DateTimeField(auto_now_add=True)
+    code       = models.IntegerField()
+    user       = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    is_used    = models.BooleanField(default=False)
+
+    def is_valid(self) :
+        return timezone.now().minute - self.created_at.minute < 30 and self.is_used != True
