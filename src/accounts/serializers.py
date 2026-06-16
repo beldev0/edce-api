@@ -35,5 +35,21 @@ class UserRegisterSerializer(serializers.ModelSerializer) :
         profil.first_name = firstname
         profil.save()
         return user
-    
 
+
+class UserProfileSerializer(serializers.ModelSerializer):
+    first_name = serializers.CharField(source='profil.first_name', read_only=True)
+    last_name = serializers.CharField(source='profil.last_name', read_only=True)
+    tel = serializers.CharField(source='profil.tel', read_only=True)
+    sexe = serializers.CharField(source='profil.sexe', read_only=True)
+    quarter = serializers.CharField(source='profil.quarter', read_only=True)
+    birth_date = serializers.DateField(source='profil.birth_date', read_only=True)
+
+    class Meta:
+        model = User
+        fields = [
+            'id', 'first_name', 'last_name', 'email', 
+            'tel', 'sexe', 'status', 'quarter', 
+            'birth_date', 'created_at'
+        ]
+        
