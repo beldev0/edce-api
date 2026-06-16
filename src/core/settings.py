@@ -136,8 +136,8 @@ EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD')
 DEFAULT_FROM_EMAIL = f"EDCE <{EMAIL_HOST_USER}>"
 
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': (
+    'DEFAULT_AUTHENTICATION_CLASSES': [
         
         'accounts.authentication.JWTCookiesAuthentication'
-    )
+    ]
 }
