@@ -20,5 +20,6 @@ from accounts.views import refresh_access_token
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('auth/', include('accounts.urls')),
+    path('children/', include('children.urls')),
     path('token/refresh/', refresh_access_token)
 ]

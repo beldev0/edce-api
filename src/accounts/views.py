@@ -230,3 +230,11 @@ def refresh_access_token(request) :
         return response
     except TokenError as e :
         return Response({"message": "Token expired. Log in again"}, status=status.HTTP_400_BAD_REQUEST)
+    
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def me(request) :
+    user = request.user
+    serializer = UserProfileSerializer(user)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
