@@ -1,0 +1,2 @@
+# EDCE
+L'objectif ici est de créer une application web qui aide les dirigeants églises (école de dilmanche)  à centraliser leurs données ainsi que celles de leurs collaborateurs ainsi que de leurs enfants.

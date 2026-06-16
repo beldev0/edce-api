@@ -1,0 +1,30 @@
+
+# python
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+# virtual env
+venv/
+env/
+
+# database
+*.sqlite3
+
+# migrations compiled
+*.pyc
+
+media/
+
+# Environments & Secrets
+.env
+.env.local
+
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Project Specific
+db.sqlite3
+pgdata/
