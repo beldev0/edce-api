@@ -57,11 +57,17 @@ class ParticipantSeanceSerializer(serializers.ModelSerializer):
         model = ParticipantSeance
         fields = ['id', 'childId', 'seanceId']
 
-class ParticipantSeanceReadSerializer(serializers.ModelSerializer):
-    id = serializers.UUIDField(read_only=True)
-    child = ChildSerializer(read_only=True)
-    seance = SeanceSerializer(read_only=True)
 
-    class Meta:
-        model = ParticipantSeance
-        fields = ['id', 'child', 'seance']
+class BulkParticipantSeanceSerializer(serializers.Serializer):
+    seanceId = serializers.PrimaryKeyRelatedField(
+        source='seance',
+        queryset=Seance.objects.all(),
+        required=True
+    )
+    # 🎯 Un tableau (List) d'identifiants de type UUID (les enfants)
+    childIds = serializers.PrimaryKeyRelatedField(
+        source='child',
+        queryset=Child.objects.all(),
+        many=True,
+        required=True
+    )
