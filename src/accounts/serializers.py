@@ -7,10 +7,10 @@ User = get_user_model()
 class UserRegisterSerializer(serializers.ModelSerializer) :
     last_name   = serializers.CharField(max_length=30)
     first_name  = serializers.CharField(max_length=30)
-    gender      = serializers.ChoiceField(choices=[('Masculin', 'MASCULIN'), ('Feminin', 'FEMININ')])
+    sexe      = serializers.ChoiceField(choices=[('Masculin', 'MASCULIN'), ('Feminin', 'FEMININ')])
     class Meta :
         model  = User
-        fields = ['id', 'email', 'password', 'last_name', 'first_name', 'gender']
+        fields = ['id', 'email', 'password', 'last_name', 'first_name', 'sexe']
         extra_kwargs = {
             'password': {'write_only':True}
         }
