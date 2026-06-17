@@ -17,9 +17,11 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from accounts.views import refresh_access_token
+
 urlpatterns = [
-    path('admin/', admin.site.urls),
-    path('auth/', include('accounts.urls')),
-    path('children/', include('children.urls')),
-    path('token/refresh/', refresh_access_token)
+    path('api/admin/', admin.site.urls),
+    path('api/', include('activities.urls')),
+    path('api/auth/', include('accounts.urls')),
+    path('api/children/', include('children.urls')),
+    path('api/token/refresh/', refresh_access_token),
 ]
