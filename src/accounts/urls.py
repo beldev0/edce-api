@@ -1,15 +1,17 @@
 from django.urls import path
-from .views import register, verify_account, resent_code, reset_password, newPassword,changePassword, login, logout, allusers, me
+from .views import register, verify_account, resent_code, reset_password, newPassword,changePassword, login, logout, allusers, me, all_moderators, all_teachers
 
 urlpatterns = [
-    path('register/', register),
-    path('login/', login),
-    path('verify-account/', verify_account),
-    path('resent-verification-code/', resent_code),
-    path('reset-password/', reset_password),
-    path('new-password/', newPassword),
-    path('change-password/', changePassword),
-    path('logout/', logout),
-    path('all/', allusers),
-    path('me/', me)
+    path('auth/register/', register),
+    path('auth/login/', login),
+    path('auth/verify-account/', verify_account),
+    path('auth/resent-verification-code/', resent_code),
+    path('auth/reset-password/', reset_password),
+    path('auth/new-password/', newPassword),
+    path('auth/change-password/', changePassword),
+    path('auth/logout/', logout),
+    path('users/all/', allusers),
+    path('users/me/', me),
+    path('users/teachers/', all_teachers, name='all-teachers'),
+    path('users/moderators/', all_moderators, name='all-moderators'),
 ]
