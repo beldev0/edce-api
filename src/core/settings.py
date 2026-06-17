@@ -46,11 +46,15 @@ INSTALLED_APPS = [
     'children',
     'activities',
     'seance',
+    'test',
     'rest_framework',
-    'rest_framework_simplejwt'
+    'rest_framework_simplejwt',
+    'drf_spectacular',
+    'corsheaders'
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',  
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -142,5 +146,18 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         
         'accounts.authentication.JWTCookiesAuthentication'
-    ]
+    ], 
+
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'EDCE',
+    'DESCRIPTION': 'EDCE Platforme.',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    # Crucial for custom cookie-based setups
+    'COMPONENT_SPLIT_REQUEST': True, 
+}
+
+CORS_ALLOW_ALL_ORIGINS = True

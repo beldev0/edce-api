@@ -17,12 +17,23 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from accounts.views import refresh_access_token
+from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
 
 urlpatterns = [
     path('api/admin/', admin.site.urls),
     path('api/', include('activities.urls')),
-    path('api/auth/', include('accounts.urls')),
+    path('api/', include('test.urls')),
+    path('api/', include('accounts.urls')),
     path('api/seances/', include('seance.urls')),
     path('api/children/', include('children.urls')),
     path('api/token/refresh/', refresh_access_token),
+
+    # Downloads raw schema configuration mapping file
+    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
+    
+    # Primary Swagger UI Interactive Web Interface
+    path('api/docs/swagger/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+    
+    # Alternative clean reading panel layout documentation
+    path('api/docs/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
 ]
