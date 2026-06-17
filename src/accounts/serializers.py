@@ -7,10 +7,10 @@ User = get_user_model()
 class UserRegisterSerializer(serializers.ModelSerializer) :
     last_name   = serializers.CharField(max_length=30)
     first_name  = serializers.CharField(max_length=30)
-    
+    gender      = serializers.ChoiceField(choices=[('MASCULIN', 'MASCULIN'), ('FEMININ', 'FEMININ')])
     class Meta :
         model  = User
-        fields = ['id', 'email', 'password', 'last_name', 'first_name']
+        fields = ['id', 'email', 'password', 'last_name', 'first_name', 'gender']
         extra_kwargs = {
             'password': {'write_only':True}
         }
@@ -29,10 +29,12 @@ class UserRegisterSerializer(serializers.ModelSerializer) :
     def create(self, validated_data):
         lastname  = validated_data.pop('last_name')
         firstname = validated_data.pop('first_name')
+        sexe      = validated_data.pop('sexe')
         user = User.objects.create_user(**validated_data)
         profil = UserProfil.objects.create(user=user)
         profil.last_name  = lastname
         profil.first_name = firstname
+        profil.sexe        = sexe
         profil.save()
         return user
 
