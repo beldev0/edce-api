@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import register, verify_account, resent_code, reset_password, newPassword,changePassword, login, logout, allusers, me, all_moderators, all_teachers
+from .views import register, verify_account, resent_code, reset_password, newPassword,changePassword, login, logout, allusers, me, all_moderators, all_teachers, update_profile
 
 urlpatterns = [
     path('auth/register/', register),
@@ -14,4 +14,5 @@ urlpatterns = [
     path('users/me/', me),
     path('users/teachers/', all_teachers, name='all-teachers'),
     path('users/moderators/', all_moderators, name='all-moderators'),
+    path('users/profil-update/', update_profile)
 ]

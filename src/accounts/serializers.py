@@ -55,3 +55,13 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'birth_date', 'created_at'
         ]
         
+
+from rest_framework import serializers
+from .models import UserProfil
+
+class UserProfilUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserProfil
+        fields = ['last_name', 'first_name', 'birth_date', 'quarter', 'sexe', 'tel']
+
+   

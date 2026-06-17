@@ -334,3 +334,31 @@ def all_moderators(request):
     moderators = User.objects.filter(status='moderator').select_related('profil')
     serializer = UserProfileSerializer(moderators, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework import status
+from .models import UserProfil
+from .serializers import UserProfilUpdateSerializer
+
+@api_view(['PUT', 'PATCH'])
+@permission_classes([IsAuthenticated])
+def update_profile(request):
+    try:
+        profile = request.user.profil
+    except UserProfil.DoesNotExist:
+        return Response({'error': 'Profil introuvable.'}, status=status.HTTP_404_NOT_FOUND)
+
+    partial = request.method == 'PATCH'
+    serializer = UserProfilUpdateSerializer(profile, data=request.data, partial=partial)
+
+    if serializer.is_valid():
+        serializer.save()
+        return Response({
+            'message': 'Profil mis à jour avec succès.',
+            'data': serializer.data
+        }, status=status.HTTP_200_OK)
+        
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
