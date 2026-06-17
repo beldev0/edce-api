@@ -22,6 +22,7 @@ urlpatterns = [
     path('api/admin/', admin.site.urls),
     path('api/', include('activities.urls')),
     path('api/auth/', include('accounts.urls')),
+    path('api/seances/', include('seance.urls')),
     path('api/children/', include('children.urls')),
     path('api/token/refresh/', refresh_access_token),
 ]

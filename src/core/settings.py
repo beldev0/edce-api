@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'accounts',
     'children',
     'activities',
+    'seance',
     'rest_framework',
     'rest_framework_simplejwt'
 ]

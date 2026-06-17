@@ -1,5 +1,6 @@
 from rest_framework import serializers
-from .models import Activity, EventActivity
+from .models import Activity, EventActivity, ParticipantEventActivity
+from children.models import Child
 
 # Sérialiseurs pour Activity
 class ActivitySerializer(serializers.ModelSerializer):
@@ -42,3 +43,20 @@ class EventActivityUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = EventActivity
         fields = ['activityId', 'eventType', 'year']
+
+
+class ParticipantEventActivitySerializer(serializers.ModelSerializer):
+    id = serializers.UUIDField(read_only=True)
+    
+    childId = serializers.PrimaryKeyRelatedField(
+        source='child',
+        queryset=Child.objects.all()
+    )
+    eventActivityId = serializers.PrimaryKeyRelatedField(
+        source='event_activity',
+        queryset=EventActivity.objects.all()
+    )
+
+    class Meta:
+        model = ParticipantEventActivity
+        fields = ['id', 'childId', 'eventActivityId']

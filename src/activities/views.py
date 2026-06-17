@@ -3,10 +3,10 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from django.shortcuts import get_object_or_404
-from .models import Activity, EventActivity
+from .models import Activity, EventActivity, ParticipantEventActivity
 from .serializers import (
     ActivitySerializer, ActivityUpdateSerializer,
-    EventActivitySerializer, EventActivityUpdateSerializer
+    EventActivitySerializer, EventActivityUpdateSerializer, ParticipantEventActivitySerializer
 )
 
 
@@ -83,3 +83,27 @@ def event_activity_detail_update_delete(request, pk):
     elif request.method == 'DELETE':
         event_activity_record.delete()
         return Response({"message": "Event-Activity link deleted successfully."}, status=status.HTTP_204_NO_CONTENT)
+    
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def participant_event_list_create(request):
+    if request.method == 'GET':
+        participants = ParticipantEventActivity.objects.all()
+        serializer = ParticipantEventActivitySerializer(participants, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    elif request.method == 'POST':
+        serializer = ParticipantEventActivitySerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def participant_event_delete(request, pk):
+    record = get_object_or_404(ParticipantEventActivity, pk=pk)
+    record.delete()
+    return Response({"message": "Participant removed from event activity successfully."}, status=status.HTTP_204_NO_CONTENT)

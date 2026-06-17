@@ -1,5 +1,6 @@
 import uuid
 from django.db import models
+from children.models import Child
 
 class Activity(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -22,3 +23,16 @@ class EventActivity(models.Model):
 
     def __str__(self):
         return f"{self.eventType} ({self.year}) - {self.activity.title}"
+    
+
+class ParticipantEventActivity(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    
+    child = models.ForeignKey(Child, on_delete=models.CASCADE, related_name="event_participations")
+    event_activity = models.ForeignKey(EventActivity, on_delete=models.CASCADE, related_name="participants")
+
+    class Meta:
+        unique_together = ('child', 'event_activity')
+
+    def __str__(self):
+        return f"{self.child.name} -> {self.event_activity.eventType}"
