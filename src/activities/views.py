@@ -39,13 +39,13 @@ def activity_list_create(request):
         serializer = ActivitySerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            return Response({"success":True, "data":serializer.data}, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 @extend_schema(
-    methods=['PATCH'],
-    summary="Modifier partiellement une activité via son ID",
+    methods=['PUT'],
+    summary="Modifier  une activité via son ID",
     request=ActivityUpdateSerializer,
     responses={200: ActivitySerializer, 400: serializers.Serializer}
 )
@@ -54,22 +54,24 @@ def activity_list_create(request):
     summary="Supprimer une activité",
     responses={204: inline_serializer("ActDel", fields={"message": serializers.CharField()})}
 )
-@api_view(['PATCH', 'DELETE'])
+@api_view(['PUT', 'DELETE'])
 @permission_classes([IsAuthenticated])
 def activity_detail_update_delete(request, pk):
     activity_record = get_object_or_404(Activity, pk=pk)
 
-    if request.method == 'PATCH':
-        serializer = ActivityUpdateSerializer(activity_record, data=request.data, partial=True)
+    if request.method == 'PUT':
+        serializer = ActivityUpdateSerializer(activity_record, data=request.data)
         if serializer.is_valid():
             serializer.save()
             full_data = ActivitySerializer(activity_record)
-            return Response(full_data.data, status=status.HTTP_200_OK)
+            return Response({"success":True, "data":full_data}, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     elif request.method == 'DELETE':
         activity_record.delete()
-        return Response({"message": "Activity deleted successfully."}, status=status.HTTP_204_NO_CONTENT)
+        return Response({
+                "success": True,
+                "message": "Activity and its event relations deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
 
 
 # ==========================================
