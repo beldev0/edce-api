@@ -34,19 +34,29 @@ def activity_list_create(request):
     if request.method == 'GET':
         activities = Activity.objects.all().order_by('title')
         serializer = ActivitySerializer(activities, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response({
+            "success": True,
+            "data": serializer.data
+        }, status=status.HTTP_200_OK)
 
     elif request.method == 'POST':
         serializer = ActivitySerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
-            return Response({"success":True, "data":serializer.data}, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            return Response({
+                "success": True, 
+                "data": serializer.data
+            }, status=status.HTTP_201_CREATED)
+            
+        return Response({
+            "success": False,
+            "errors": serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
 
 
 @extend_schema(
     methods=['PUT'],
-    summary="Modifier  une activité via son ID",
+    summary="Modifier une activité via son ID",
     request=ActivityUpdateSerializer,
     responses={200: ActivitySerializer, 400: serializers.Serializer}
 )
@@ -65,14 +75,22 @@ def activity_detail_update_delete(request, pk):
         if serializer.is_valid():
             serializer.save()
             full_data = ActivitySerializer(activity_record)
-            return Response({"success":True, "data":full_data}, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            return Response({
+                "success": True, 
+                "data": full_data.data
+            }, status=status.HTTP_200_OK)
+            
+        return Response({
+            "success": False,
+            "errors": serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
 
     elif request.method == 'DELETE':
         activity_record.delete()
         return Response({
-                "success": True,
-                "message": "Activity and its event relations deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
+            "success": True,
+            "message": "Activity and its event relations deleted successfully"
+        }, status=status.HTTP_200_OK)
 
 
 # ==========================================
@@ -96,23 +114,20 @@ def activity_detail_update_delete(request, pk):
 @permission_classes([IsAuthenticated])
 def event_activity_list_create(request):
     if request.method == 'GET':
-        # Retourner les événements en format spec
         from django.db.models import Q
         from itertools import groupby
         
         event_activities = EventActivity.objects.all().select_related('activity').order_by('year', 'eventType')
         
-        # listActivityAtEvent: tous les événements avec leurs données
+        # Position fixed to keep positional args before keyword args
         list_activity_at_event = list(
             event_activities.values('id', 'year', 'eventType', activity_id='activity_id')
         )
         
-        # listEvent: liste unique des types d'événements
         list_events = list(
             set(event_activities.values_list('eventType', flat=True).distinct())
         )
         
-        # groupActivityperYear: regrouper par année
         group_activity_per_year = {}
         for event in event_activities:
             year = event.year
@@ -123,7 +138,6 @@ def event_activity_list_create(request):
                 'title': event.activity.title
             })
         
-        # groupActivityperEvent: regrouper par type d'événement
         group_activity_per_event = {}
         for event in event_activities:
             event_type = event.eventType
@@ -135,10 +149,13 @@ def event_activity_list_create(request):
             })
         
         return Response({
-            "listActivityAtEvent": list_activity_at_event,
-            "listEvent": list_events,
-            "groupActivityperYear": group_activity_per_year,
-            "groupActivityperEvent": group_activity_per_event
+            "success": True,
+            "data": {
+                "listActivityAtEvent": list_activity_at_event,
+                "listEvent": list_events,
+                "groupActivityperYear": group_activity_per_year,
+                "groupActivityperEvent": group_activity_per_event
+            }
         }, status=status.HTTP_200_OK)
 
     elif request.method == 'POST':
@@ -150,7 +167,7 @@ def event_activity_list_create(request):
                 "data": serializer.data
             }, status=status.HTTP_201_CREATED)
         
-        # Error response matching spec
+        # Consistent custom error checking for missing fields
         missing_fields = []
         if 'activityId' not in request.data or not request.data.get('activityId'):
             missing_fields.append('activityId')
@@ -161,11 +178,14 @@ def event_activity_list_create(request):
         
         if missing_fields:
             return Response({
-                "statusCode": 400,
-                "statusMessage": f"Missing fields: {', '.join(missing_fields)} are required"
+                "success": False,
+                "errors": f"Missing fields: {', '.join(missing_fields)} are required"
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        return Response({
+            "success": False,
+            "errors": serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
 
 
 @extend_schema(
@@ -200,7 +220,11 @@ def event_activity_detail_update_delete(request, pk):
                 "success": True,
                 "data": full_data.data
             }, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            
+        return Response({
+            "success": False,
+            "errors": serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
 
     elif request.method == 'DELETE':
         event_activity_record.delete()
