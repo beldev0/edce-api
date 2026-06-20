@@ -47,6 +47,8 @@ INSTALLED_APPS = [
     'activities',
     'seance',
     'test',
+    'participants',
+    'schedules',
     'rest_framework',
     'rest_framework_simplejwt',
     'drf_spectacular',

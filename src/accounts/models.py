@@ -48,6 +48,7 @@ class UserProfil(models.Model) :
     quarter    = models.CharField(max_length=30, blank=True)
     sexe       = models.CharField(max_length=12, choices=[('Masculin', 'MASCULIN'), ('Feminin', 'FEMININ')], blank=True)
     tel        = models.CharField(max_length=15, blank=True)
+    isAvailable = models.BooleanField(default=True)
     user       = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='profil')
 
 

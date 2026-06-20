@@ -28,3 +28,5 @@ Thumbs.db
 # Project Specific
 db.sqlite3
 pgdata/
+*.md
+*.pdf

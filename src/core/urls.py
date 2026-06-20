@@ -22,12 +22,17 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, Sp
 urlpatterns = [
     path('api/admin/', admin.site.urls),
     path('api/admin/users/', allusers),
-    path('api/admin/users/<int:id>/', change_user_status),
+    path('api/admin/users/<uuid:id>/', change_user_status),
+    
+    # Apps inclusion
     path('api/', include('activities.urls')),
     path('api/', include('test.urls')),
     path('api/', include('accounts.urls')),
     path('api/seances/', include('seance.urls')),
     path('api/children/', include('children.urls')),
+    path('api/participants/', include('participants.urls')),
+    path('api/schedules/', include('schedules.urls')),
+    
     path('api/token/refresh/', refresh_access_token),
 
     # Downloads raw schema configuration mapping file

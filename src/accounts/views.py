@@ -359,29 +359,179 @@ def me(request):
     responses={200: UserProfileSerializer(many=True)}
 )
 @api_view(['GET'])
-@permission_classes([AllowAny]) # Change to IsAuthenticated if you want to protect this list
+@permission_classes([AllowAny])
 def all_teachers(request):
     """
-    Returns an index list filtering only users whose status string equals 'teacher'.
+    Returns a complete structure with teachers list and filtered sub-lists.
+    Format spec: { listTeachers, teachersAvailable, teachersUnavailable, teacherMasculin, teacherFeminin }
     """
-    teachers = User.objects.filter(status='teacher').select_related('profil')
+    teachers = User.objects.filter(status='teacher').select_related('profil').order_by('profil__first_name')
     serializer = UserProfileSerializer(teachers, many=True)
-    return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    teachers_data = serializer.data
+    teachers_available = [t for t in teachers_data if t.get('isAvailable', True)]
+    teachers_unavailable = [t for t in teachers_data if not t.get('isAvailable', True)]
+    teachers_masculin = [t for t in teachers_data if t.get('sexe') == 'Masculin']
+    teachers_feminin = [t for t in teachers_data if t.get('sexe') == 'Feminin']
+    
+    return Response({
+        "listTeachers": teachers_data,
+        "teachersAvailable": teachers_available,
+        "teachersUnavailable": teachers_unavailable,
+        "teacherMasculin": teachers_masculin,
+        "teacherFeminin": teachers_feminin
+    }, status=status.HTTP_200_OK)
+
+
+@extend_schema(
+    summary="Update teacher profile and availability",
+    description="Update teacher information with optional fields (status, quarter, tel, isAvailable)",
+    request=inline_serializer(
+        name='UpdateTeacherRequest',
+        fields={
+            'status': serializers.CharField(required=False),
+            'quarter': serializers.CharField(required=False),
+            'tel': serializers.CharField(required=False),
+            'isAvailable': serializers.BooleanField(required=False)
+        }
+    ),
+    responses={
+        200: inline_serializer(
+            name='UpdateTeacherResponse',
+            fields={
+                'success': serializers.BooleanField(),
+                'message': serializers.CharField()
+            }
+        ),
+        404: inline_serializer(
+            name='UpdateTeacherNotFound',
+            fields={'statusCode': serializers.IntegerField(), 'statusMessage': serializers.CharField()}
+        )
+    }
+)
+@api_view(['PUT'])
+@permission_classes([IsAuthenticated])
+def update_teacher(request, id):
+    """Update teacher profile and availability."""
+    try:
+        user = User.objects.get(id=id, status='teacher')
+    except User.DoesNotExist:
+        return Response({
+            'statusCode': 404,
+            'statusMessage': 'Teacher not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+    
+    profil = user.profil
+    
+    # Update User status if provided
+    if 'status' in request.data:
+        user.status = request.data['status']
+        user.save()
+    
+    # Update UserProfil fields
+    if 'quarter' in request.data:
+        profil.quarter = request.data['quarter']
+    if 'tel' in request.data:
+        profil.tel = request.data['tel']
+    if 'isAvailable' in request.data:
+        profil.isAvailable = request.data['isAvailable']
+    
+    profil.save()
+    
+    return Response({
+        'success': True,
+        'message': 'Teacher updated successfully'
+    }, status=status.HTTP_200_OK)
 
 
 @extend_schema(
     summary="List all recorded accounts with MODERATOR status",
-    responses={200: UserProfileSerializer(many=True)}
+    responses={200: serializers.Serializer()}
 )
 @api_view(['GET'])
-@permission_classes([AllowAny]) # Change to IsAuthenticated if you want to protect this list
+@permission_classes([AllowAny])
 def all_moderators(request):
     """
-    Returns an index list filtering only users whose status string equals 'moderator'.
+    Returns a complete structure with moderators list and filtered sub-lists.
+    Format spec: { listModerators, moderatorsAvailable, moderatorsUnavailable, moderatorMasculin, moderatorFeminin }
     """
-    moderators = User.objects.filter(status='moderator').select_related('profil')
+    moderators = User.objects.filter(status='moderator').select_related('profil').order_by('profil__first_name')
     serializer = UserProfileSerializer(moderators, many=True)
-    return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    moderators_data = serializer.data
+    moderators_available = [m for m in moderators_data if m.get('isAvailable', True)]
+    moderators_unavailable = [m for m in moderators_data if not m.get('isAvailable', True)]
+    moderators_masculin = [m for m in moderators_data if m.get('sexe') == 'Masculin']
+    moderators_feminin = [m for m in moderators_data if m.get('sexe') == 'Feminin']
+    
+    return Response({
+        "listModerators": moderators_data,
+        "moderatorsAvailable": moderators_available,
+        "moderatorsUnavailable": moderators_unavailable,
+        "moderatorMasculin": moderators_masculin,
+        "moderatorFeminin": moderators_feminin
+    }, status=status.HTTP_200_OK)
+
+
+@extend_schema(
+    summary="Update moderator profile and availability",
+    description="Update moderator information with optional fields (status, quarter, tel, isAvailable)",
+    request=inline_serializer(
+        name='UpdateModeratorRequest',
+        fields={
+            'status': serializers.CharField(required=False),
+            'quarter': serializers.CharField(required=False),
+            'tel': serializers.CharField(required=False),
+            'isAvailable': serializers.BooleanField(required=False)
+        }
+    ),
+    responses={
+        200: inline_serializer(
+            name='UpdateModeratorResponse',
+            fields={
+                'success': serializers.BooleanField(),
+                'message': serializers.CharField()
+            }
+        ),
+        404: inline_serializer(
+            name='UpdateModeratorNotFound',
+            fields={'statusCode': serializers.IntegerField(), 'statusMessage': serializers.CharField()}
+        )
+    }
+)
+@api_view(['PUT'])
+@permission_classes([IsAuthenticated])
+def update_moderator(request, id):
+    """Update moderator profile and availability."""
+    try:
+        user = User.objects.get(id=id, status='moderator')
+    except User.DoesNotExist:
+        return Response({
+            'statusCode': 404,
+            'statusMessage': 'Moderator not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+    
+    profil = user.profil
+    
+    # Update User status if provided
+    if 'status' in request.data:
+        user.status = request.data['status']
+        user.save()
+    
+    # Update UserProfil fields
+    if 'quarter' in request.data:
+        profil.quarter = request.data['quarter']
+    if 'tel' in request.data:
+        profil.tel = request.data['tel']
+    if 'isAvailable' in request.data:
+        profil.isAvailable = request.data['isAvailable']
+    
+    profil.save()
+    
+    return Response({
+        'success': True,
+        'message': 'Moderator updated successfully'
+    }, status=status.HTTP_200_OK)
 
 
 from rest_framework.decorators import api_view, permission_classes

@@ -5,20 +5,19 @@ from rest_framework import status, serializers
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema, inline_serializer
 
-from .models import Seance, ParticipantSeance
-from .serializers import (
-    BulkParticipantSeanceSerializer, SeanceSerializer, SeanceUpdateSerializer, 
-    ParticipantSeanceSerializer)
+from .models import Seance
+from .serializers import SeanceSerializer, SeanceUpdateSerializer
 
 
 @extend_schema(
     methods=['GET'],
-    summary="Liste toutes les séances de cours",
-    responses={200: SeanceSerializer(many=True)}
+    summary="Récupération et regroupement des séances",
+    description="Retourne toutes les séances, optionnellement filtrées par authorId. Format avec regroupements par type, classe, année.",
+    responses={200: serializers.Serializer()}
 )
 @extend_schema(
     methods=['POST'],
-    summary="Créer une nouvelle séance de cours",
+    summary="Créer une nouvelle séance",
     request=SeanceSerializer,
     responses={201: SeanceSerializer, 400: serializers.Serializer}
 )
@@ -26,103 +25,102 @@ from .serializers import (
 @permission_classes([IsAuthenticated])
 def seance_list_create(request):
     if request.method == 'GET':
-        seances = Seance.objects.all().order_by('-created_at')
-        serializer = SeanceSerializer(seances, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        # Check for optional authorId filter
+        author_id = request.query_params.get('authorId')
+        
+        if author_id:
+            # Filter by author - simple list format
+            seances = Seance.objects.filter(author_id=author_id).order_by('-created_at')
+            serializer = SeanceSerializer(seances, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        
+        # Default: return grouped structure
+        seances = Seance.objects.all().select_related('author', 'supervisor').order_by('-created_at')
+        
+        # Group by type
+        group_by_type = {}
+        group_by_classe = {}
+        group_by_year = {}
+        
+        for seance in seances:
+            serialized = SeanceSerializer(seance).data
+            
+            # Group by type
+            seance_type = seance.type
+            if seance_type not in group_by_type:
+                group_by_type[seance_type] = []
+            group_by_type[seance_type].append(serialized)
+            
+            # Group by classe
+            classe = seance.classe
+            if classe not in group_by_classe:
+                group_by_classe[classe] = []
+            group_by_classe[classe].append(serialized)
+            
+            # Group by year
+            year = str(seance.created_at.year)
+            if year not in group_by_year:
+                group_by_year[year] = []
+            group_by_year[year].append(serialized)
+        
+        return Response({
+            "listSeances": [SeanceSerializer(s).data for s in seances],
+            "groupSeanceperType": group_by_type,
+            "groupSeanceperClasse": group_by_classe,
+            "groupSeanceperYear": group_by_year
+        }, status=status.HTTP_200_OK)
 
     elif request.method == 'POST':
         serializer = SeanceSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save(author=request.user)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            return Response({
+                "success": True,
+                "data": serializer.data
+            }, status=status.HTTP_201_CREATED)
+        
+        # Check for missing fields
+        required_fields = ['title', 'type', 'classe', 'supervisorId']
+        missing = [f for f in required_fields if f not in request.data or not request.data.get(f)]
+        if missing:
+            return Response({
+                "statusCode": 400,
+                "statusMessage": f"Missing required fields for creating a seance: {', '.join(missing)}"
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 @extend_schema(
-    methods=['PATCH'],
-    summary="Modifier partiellement une séance (PATCH)",
+    methods=['PUT'],
+    summary="Mise à jour d'une séance",
     request=SeanceUpdateSerializer,
     responses={200: SeanceSerializer, 400: serializers.Serializer}
 )
 @extend_schema(
     methods=['DELETE'],
-    summary="Supprimer une séance",
-    responses={204: inline_serializer("SeanceDel", fields={"message": serializers.CharField()})}
+    summary="Suppression d'une séance",
+    responses={200: inline_serializer("SeanceDel", fields={"success": serializers.BooleanField(), "message": serializers.CharField()})}
 )
-@api_view(['PATCH', 'DELETE'])
+@api_view(['PUT', 'DELETE'])
 @permission_classes([IsAuthenticated])
 def seance_detail_update_delete(request, pk):
     seance_record = get_object_or_404(Seance, pk=pk)
 
-    if request.method == 'PATCH':
+    if request.method == 'PUT':
         serializer = SeanceUpdateSerializer(seance_record, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
             full_serializer = SeanceSerializer(seance_record)
-            return Response(full_serializer.data, status=status.HTTP_200_OK)
+            return Response({
+                "success": True,
+                "data": full_serializer.data
+            }, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     elif request.method == 'DELETE':
         seance_record.delete()
-        return Response({"message": "Seance record deleted successfully."}, status=status.HTTP_204_NO_CONTENT)
-    
-
-@extend_schema(
-    methods=['GET'],
-    summary="Liste les présences aux séances (Format simple)",
-    responses={200: ParticipantSeanceSerializer(many=True)}
-)
-@extend_schema(
-    methods=['POST'],
-    summary="Marquer plusieurs enfants présents à une séance (Bulk)",
-    description="Permet d'envoyer l'ID de la séance et la liste de tous les enfants présents d'un coup.",
-    request=BulkParticipantSeanceSerializer,
-    responses={
-        201: ParticipantSeanceSerializer(many=True), 
-        400: serializers.Serializer
-    }
-)
-@api_view(['GET', 'POST'])
-@permission_classes([IsAuthenticated])
-def participant_seance_list_create(request):
-    if request.method == 'GET':
-        participants = ParticipantSeance.objects.all()
-        serializer = ParticipantSeanceSerializer(participants, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
-    elif request.method == 'POST':
-        # 1. On valide les données reçues via le sérialiseur de Bulk
-        bulk_serializer = BulkParticipantSeanceSerializer(data=request.data)
-        if bulk_serializer.is_valid():
-            seance_instance = bulk_serializer.validated_data['seance']
-            children_list = bulk_serializer.validated_data['child'] # Contient la liste des instances d'enfants
-            
-            created_instances = []
-            
-            # 2. On crée les participations en évitant les doublons
-            for child_instance in children_list:
-                # get_or_create évite de crash si un enfant était déjà marqué présent
-                obj, created = ParticipantSeance.objects.get_or_create(
-                    seance=seance_instance,
-                    child=child_instance
-                )
-                created_instances.append(obj)
-            
-            # 3. On renvoie au front le tableau complet des lignes créées/existantes
-            return_serializer = ParticipantSeanceSerializer(created_instances, many=True)
-            return Response(return_serializer.data, status=status.HTTP_201_CREATED)
-            
-        return Response(bulk_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-
-@extend_schema(
-    summary="Annuler la présence d'un enfant à une séance",
-    responses={204: inline_serializer("PartSeanceDel", fields={"message": serializers.CharField()})}
-)
-@api_view(['DELETE'])
-@permission_classes([IsAuthenticated])
-def participant_seance_delete(request, pk):
-    record = get_object_or_404(ParticipantSeance, pk=pk)
-    record.delete()
-    return Response({"message": "Participant removed from seance successfully."}, status=status.HTTP_204_NO_CONTENT)
+        return Response({
+            "success": True,
+            "message": "Seance deleted successfully"
+        }, status=status.HTTP_200_OK)

@@ -54,13 +54,14 @@ class UserProfileSerializer(serializers.ModelSerializer):
     sexe = serializers.CharField(source='profil.sexe', read_only=True)
     quarter = serializers.CharField(source='profil.quarter', read_only=True)
     birth_date = serializers.DateField(source='profil.birth_date', read_only=True)
+    isAvailable = serializers.BooleanField(source='profil.isAvailable', read_only=True)
 
     class Meta:
         model = User
         fields = [
             'id', 'first_name', 'last_name', 'email', 
             'tel', 'sexe', 'status', 'quarter', 
-            'birth_date', 'created_at'
+            'birth_date', 'created_at', 'isAvailable'
         ]
         
 
@@ -70,6 +71,6 @@ from .models import UserProfil
 class UserProfilUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserProfil
-        fields = ['last_name', 'first_name', 'birth_date', 'quarter', 'sexe', 'tel']
+        fields = ['last_name', 'first_name', 'birth_date', 'quarter', 'sexe', 'tel', 'isAvailable']
 
    

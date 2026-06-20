@@ -11,6 +11,7 @@ from .serializers import (
     EventActivitySerializer, EventActivityUpdateSerializer, 
     ParticipantEventActivitySerializer
 )
+from children.models import Child
 
 # ==========================================
 # 🚀 VIEWS POUR ACTIVITY
@@ -80,98 +81,130 @@ def activity_detail_update_delete(request, pk):
 
 @extend_schema(
     methods=['GET'],
-    summary="Liste toutes les liaisons Activités-Événements",
-    responses={200: EventActivitySerializer(many=True)}
+    summary="Liste complète des événements avec regroupements",
+    description="Retourne les événements bruts et les données traitées (regroupées par année et par type)",
+    responses={200: serializers.Serializer()}
 )
 @extend_schema(
     methods=['POST'],
-    summary="Lier une activité à un événement (Arbre de Noël, etc.)",
+    summary="Créer une relation Activité-Événement",
+    description="Lier une activité à un type d'événement (ex: Arbre de Noël, Soirée récréative)",
     request=EventActivitySerializer,
-    responses={201: EventActivitySerializer, 400: serializers.Serializer}
+    responses={201: serializers.Serializer(), 400: serializers.Serializer}
 )
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def event_activity_list_create(request):
     if request.method == 'GET':
-        events = EventActivity.objects.all().order_by('-year')
-        serializer = EventActivitySerializer(events, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        # Retourner les événements en format spec
+        from django.db.models import Q
+        from itertools import groupby
+        
+        event_activities = EventActivity.objects.all().select_related('activity').order_by('year', 'eventType')
+        
+        # listActivityAtEvent: tous les événements avec leurs données
+        list_activity_at_event = list(
+            event_activities.values('id', 'year', 'eventType', activity_id='activity_id')
+        )
+        
+        # listEvent: liste unique des types d'événements
+        list_events = list(
+            set(event_activities.values_list('eventType', flat=True).distinct())
+        )
+        
+        # groupActivityperYear: regrouper par année
+        group_activity_per_year = {}
+        for event in event_activities:
+            year = event.year
+            if year not in group_activity_per_year:
+                group_activity_per_year[year] = []
+            group_activity_per_year[year].append({
+                'id': str(event.activity_id),
+                'title': event.activity.title
+            })
+        
+        # groupActivityperEvent: regrouper par type d'événement
+        group_activity_per_event = {}
+        for event in event_activities:
+            event_type = event.eventType
+            if event_type not in group_activity_per_event:
+                group_activity_per_event[event_type] = []
+            group_activity_per_event[event_type].append({
+                'id': str(event.activity_id),
+                'title': event.activity.title
+            })
+        
+        return Response({
+            "listActivityAtEvent": list_activity_at_event,
+            "listEvent": list_events,
+            "groupActivityperYear": group_activity_per_year,
+            "groupActivityperEvent": group_activity_per_event
+        }, status=status.HTTP_200_OK)
 
     elif request.method == 'POST':
         serializer = EventActivitySerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            return Response({
+                "success": True,
+                "data": serializer.data
+            }, status=status.HTTP_201_CREATED)
+        
+        # Error response matching spec
+        missing_fields = []
+        if 'activityId' not in request.data or not request.data.get('activityId'):
+            missing_fields.append('activityId')
+        if 'eventType' not in request.data or not request.data.get('eventType'):
+            missing_fields.append('eventType')
+        if 'year' not in request.data or not request.data.get('year'):
+            missing_fields.append('year')
+        
+        if missing_fields:
+            return Response({
+                "statusCode": 400,
+                "statusMessage": f"Missing fields: {', '.join(missing_fields)} are required"
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 @extend_schema(
-    methods=['PATCH'],
-    summary="Modifier partiellement une liaison Événement-Activité",
+    methods=['PUT'],
+    summary="Mettre à jour une relation Activité-Événement",
+    description="Modifier le type d'événement ou l'année d'une liaison",
     request=EventActivityUpdateSerializer,
-    responses={200: EventActivitySerializer, 400: serializers.Serializer}
+    responses={
+        200: serializers.Serializer(),
+        404: serializers.Serializer()
+    }
 )
 @extend_schema(
     methods=['DELETE'],
-    summary="Supprimer une liaison Événement-Activité",
-    responses={204: inline_serializer("EvDel", fields={"message": serializers.CharField()})}
+    summary="Supprimer une relation Activité-Événement",
+    responses={
+        200: serializers.Serializer(),
+        404: serializers.Serializer()
+    }
 )
-@api_view(['PATCH', 'DELETE'])
+@api_view(['PUT', 'DELETE'])
 @permission_classes([IsAuthenticated])
 def event_activity_detail_update_delete(request, pk):
     event_activity_record = get_object_or_404(EventActivity, pk=pk)
 
-    if request.method == 'PATCH':
+    if request.method == 'PUT':
         serializer = EventActivityUpdateSerializer(event_activity_record, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
             full_data = EventActivitySerializer(event_activity_record)
-            return Response(full_data.data, status=status.HTTP_200_OK)
+            return Response({
+                "success": True,
+                "data": full_data.data
+            }, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     elif request.method == 'DELETE':
         event_activity_record.delete()
-        return Response({"message": "Event-Activity link deleted successfully."}, status=status.HTTP_204_NO_CONTENT)
-    
-
-# ==========================================
-# 🚀 VIEWS POUR PARTICIPANTS (Inscriptions)
-# ==========================================
-
-@extend_schema(
-    methods=['GET'],
-    summary="Liste toutes les participations des enfants aux événements",
-    responses={200: ParticipantEventActivitySerializer(many=True)}
-)
-@extend_schema(
-    methods=['POST'],
-    summary="Inscrire un enfant à un événement",
-    request=ParticipantEventActivitySerializer,
-    responses={201: ParticipantEventActivitySerializer, 400: serializers.Serializer}
-)
-@api_view(['GET', 'POST'])
-@permission_classes([IsAuthenticated])
-def participant_event_list_create(request):
-    if request.method == 'GET':
-        participants = ParticipantEventActivity.objects.all()
-        serializer = ParticipantEventActivitySerializer(participants, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
-    elif request.method == 'POST':
-        serializer = ParticipantEventActivitySerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-@extend_schema(
-    summary="Désinscrire un enfant d'un événement via l'ID de participation",
-    responses={204: inline_serializer("PartDel", fields={"message": serializers.CharField()})}
-)
-@api_view(['DELETE'])
-@permission_classes([IsAuthenticated])
-def participant_event_delete(request, pk):
-    record = get_object_or_404(ParticipantEventActivity, pk=pk)
-    record.delete()
-    return Response({"message": "Participant removed from event activity successfully."}, status=status.HTTP_204_NO_CONTENT)
+        return Response({
+            "success": True,
+            "message": "Activity and its event relations deleted successfully"
+        }, status=status.HTTP_200_OK)
