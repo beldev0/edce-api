@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model, authenticate
 from rest_framework.response import Response
 from rest_framework import status, serializers
 from rest_framework.decorators import permission_classes, api_view
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import IsAuthenticated, AllowAny, IsAdminUser
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 from drf_spectacular.utils import extend_schema, inline_serializer
@@ -148,42 +148,76 @@ def login(request):
     if not user:
         return Response({"message": "Invalid credentials"}, status=status.HTTP_400_BAD_REQUEST)
     
-    serializer = UserProfileSerializer(user)
-    response = Response(serializer.data, status=status.HTTP_200_OK)
-
     refresh = RefreshToken.for_user(user)
+
+    serializer = UserProfileSerializer(user)
+    response = Response({"token":str(refresh.access_token), "user":serializer.data}, status=status.HTTP_200_OK)
+
     response.set_cookie(key='access', value=str(refresh.access_token), max_age=300, samesite='None', httponly=True, secure=False)
     response.set_cookie(key='refresh', value=str(refresh), max_age=86400, samesite='None', httponly=True, secure=False)
     return response
 
 
 @extend_schema(
-    summary="Trigger password reset workflow",
-    request=ResetPasswordInputSerializer,
+    summary="Demande de réinitialisation (Mot de passe oublié)",
+    description="Génère un code OTP à 6 chiffres, l'envoie par email à l'utilisateur et désactive temporairement le compte.",
+    request=inline_serializer(
+        name='ForgotPasswordRequest',
+        fields={
+            'email': serializers.EmailField(help_text="Email du compte à réinitialiser")
+        }
+    ),
     responses={
-        200: inline_serializer("ResetSuccessId", fields={"userId": serializers.UUIDField()}),
-        400: inline_serializer("ResetError", fields={"message": serializers.CharField()})
+        200: inline_serializer(
+            name='ForgotPasswordResponse200',
+            fields={
+                'success': serializers.BooleanField(default=True),
+                'message': serializers.CharField(default="Reset email sent successfully")
+            }
+        ),
+        400: inline_serializer(
+            name='ForgotPasswordResponse400',
+            fields={
+                'success': serializers.BooleanField(default=False),
+                'message': serializers.CharField(default="Email invalide")
+            }
+        )
     }
 )
+
 @api_view(['POST'])
 @permission_classes([AllowAny])
-def reset_password(request):
+def forgot_password(request):
     email = request.data.get('email')
     result = User.objects.filter(email=email)
+    
     if not result.exists():
-        return Response({"message": "Email invalide"}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({
+            "success": False,
+            "message": "Email invalide"
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    user = result[0]
+    code = randint(100_000, 999_999)
+    AccountVerificationCode.objects.create(user=user, code=code)
+    
+    success_response = Response({
+        "success": True,
+        "message": "Reset email sent successfully"
+    }, status=status.HTTP_200_OK)
     
     try:
-        user = result[0]
-        code = randint(100_000, 999_999)
-        AccountVerificationCode.objects.create(user=user, code=code)
-        send_verification_mail(user.email, message=f"Votre de code reinitialisation est le : {code}", subject="Code de reinitialisation mot de passe")
+        send_verification_mail(
+            user.email, 
+            message=f"Votre de code reinitialisation est le : {code}", 
+            subject="Code de reinitialisation mot de passe"
+        )
         user.is_active = False
         user.save()
-        return Response({'userId': user.id}, status=status.HTTP_200_OK)
-    except:
-        print('Erreur lors de l\'envoi du mail')
-
+        return success_response
+    except Exception as e:
+        print(f"Erreur lors de l'envoi du mail: {e}")
+        return success_response
 
 @extend_schema(
     summary="Change password string while logged in",
@@ -221,30 +255,44 @@ def changePassword(request):
 )
 @api_view(['POST'])
 @permission_classes([AllowAny])
-def newPassword(request):
-    id = request.data.get('id')
-    code = request.data.get('code')
+def reset_password(request):
+    token = request.data.get('token')
     password = request.data.get('password')
-    confirm_password = request.data.get('confirm_password')
 
-    user_qs = User.objects.filter(id=id)
-    if user_qs.exists():
-        user = user_qs[0]
-        result = AccountVerificationCode.objects.filter(user=user, code=code)
-        if result.exists():
-            row = result[0]
-            if row.is_valid():
-                if password == confirm_password:
-                    user.set_password(password)
-                    user.is_active = True
-                    row.is_used = True
-                    row.save()
-                    user.save()
-                    return Response({"message": "Mot de passe réinitialisé"}, status=status.HTTP_200_OK)
-                return Response({"message": "Mot de passe non conforme"}, status=status.HTTP_400_BAD_REQUEST)
-            return Response({"message": "Le code a expiré"}, status=status.HTTP_400_BAD_REQUEST)
-        return Response({"message": "Code non valide"}, status=status.HTTP_400_BAD_REQUEST)
-    return Response({"message": "Identifiant incorrect"}, status=status.HTTP_400_BAD_REQUEST)
+    if not token or not password:
+        return Response({
+            "success": False,
+            "message": "Champs token et password requis"
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    code_qs = AccountVerificationCode.objects.filter(code=token)
+    
+    if code_qs.exists():
+        row = code_qs[0]
+        
+        if row.is_valid():
+            user = row.user
+            user.set_password(password)
+            user.is_active = True
+            user.save()
+            
+            row.is_used = True
+            row.save()
+            
+            return Response({
+                "success": True,
+                "message": "Password reset successfully"
+            }, status=status.HTTP_200_OK)
+            
+        return Response({
+            "success": False,
+            "message": "Le code a expiré ou a déjà été utilisé"
+        }, status=status.HTTP_400_BAD_REQUEST)
+        
+    return Response({
+        "success": False,
+        "message": "Code non valide"
+    }, status=status.HTTP_400_BAD_REQUEST)
 
 
 @extend_schema(
@@ -265,7 +313,7 @@ def logout(request):
     responses={200: UserProfileSerializer(many=True)}
 )
 @api_view(['GET'])
-@permission_classes([AllowAny])
+@permission_classes([IsAdminUser])
 def allusers(request):
     users = User.objects.all()
     serializer = UserProfileSerializer(users, many=True)
@@ -362,3 +410,79 @@ def update_profile(request):
         }, status=status.HTTP_200_OK)
         
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@extend_schema(
+    summary="Modification du statut d'un utilisateur (Admin uniquement)",
+    description="Permet à un administrateur de modifier les privilèges d'un utilisateur (ex: le passer admin).",
+    request=inline_serializer(
+        name='ChangeUserStatusRequest',
+        fields={
+            'status': serializers.ChoiceField(choices=['admin', 'user'], help_text="Le nouveau rôle à attribuer")
+        }
+    ),
+    responses={
+        200: inline_serializer(
+            name='ChangeUserStatusResponse200',
+            fields={
+                'success': serializers.BooleanField(default=True),
+                'message': serializers.CharField(default="Le statut de l'utilisateur a été modifié en admin avec succès.")
+            }
+        ),
+        400: inline_serializer(
+            name='ChangeUserStatusResponse400',
+            fields={
+                'success': serializers.BooleanField(default=False),
+                'message': serializers.CharField(default="Statut non spécifié ou invalide.")
+            }
+        ),
+        404: inline_serializer(
+            name='ChangeUserStatusResponse404',
+            fields={
+                'detail': serializers.CharField(default="Not found.")
+            }
+        )
+    }
+)
+
+@api_view(['PATCH'])
+@permission_classes([IsAdminUser]) # 🔒 Restreint strictement aux comptes Staff/Admin
+def change_user_status(request, id):
+    # Récupère l'utilisateur ou renvoie une erreur 404 si l'ID n'existe pas
+    try:
+        user_to_modify = User.objects.get(id=id)
+    except User.DoesNotExist:
+        return Response({
+            "success": False,
+            "message": "Utilisateur introuvable"
+        }, status=status.HTTP_404_NOT_FOUND)
+
+    new_status = request.data.get('status')
+
+    if not new_status:
+        return Response({
+            "success": False,
+            "message": "Le champ 'status' est requis."
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    # Logique d'attribution du rôle
+    if new_status == "admin":
+        user_to_modify.is_staff = True
+        # Si tu gères aussi is_superuser, tu peux l'activer ici
+    elif new_status == "user":
+        user_to_modify.is_staff = False
+    else:
+        return Response({
+            "success": False,
+            "message": "Statut invalide. Utilisez 'admin' ou 'user'."
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    user_to_modify.save()
+
+    # Récupération du prénom pour coller exactement à ton format de réponse dynamique
+    first_name = user_to_modify.first_name if user_to_modify.first_name else "l'utilisateur"
+
+    return Response({
+        "success": True,
+        "message": f"Le statut de {first_name} a été modifié en {new_status} avec succès."
+    }, status=status.HTTP_200_OK)

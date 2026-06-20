@@ -7,12 +7,17 @@ User = get_user_model()
 class UserRegisterSerializer(serializers.ModelSerializer) :
     last_name   = serializers.CharField(max_length=30)
     first_name  = serializers.CharField(max_length=30)
-    sexe      = serializers.ChoiceField(choices=[('Masculin', 'MASCULIN'), ('Feminin', 'FEMININ')])
+    sexe        = serializers.ChoiceField(choices=[('Masculin', 'MASCULIN'), ('Feminin', 'FEMININ')])
+    birthDate   = serializers.DateField()
+    quarter     = serializers.CharField(allow_blank=True, required=False)
+    tel         = serializers.CharField(max_length=15, required=False, allow_blank=True)
+
     class Meta :
         model  = User
-        fields = ['id', 'email', 'password', 'last_name', 'first_name', 'sexe']
+        fields = ['id', 'email', 'password', 'last_name', 'first_name', 'sexe', 'birthDate', 'quarter', 'tel','created_at']
         extra_kwargs = {
-            'password': {'write_only':True}
+            'password'   : {'write_only':True},
+            'created_at' : {'read_only':True}
         }
 
     def validate_email(self, value) :
@@ -27,14 +32,17 @@ class UserRegisterSerializer(serializers.ModelSerializer) :
 
 
     def create(self, validated_data):
-        lastname  = validated_data.pop('last_name')
-        firstname = validated_data.pop('first_name')
-        sexe      = validated_data.pop('sexe')
+        profil_dict = {
+            "last_name"  : validated_data.pop('last_name'),
+            "first_name" : validated_data.pop('first_name'),
+            "sexe"       : validated_data.pop('sexe'),
+            "birthDate"  : validated_data.pop('birthDate'),
+            "quarter"    : validated_data.get('quarter', ''),
+            "tel"        : validated_data.get('tel', '')
+        }
         user = User.objects.create_user(**validated_data)
-        profil = UserProfil.objects.create(user=user)
-        profil.last_name  = lastname
-        profil.first_name = firstname
-        profil.sexe        = sexe
+        profil = UserProfil.objects.create(user=user, **profil_dict)
+        
         profil.save()
         return user
 

@@ -16,11 +16,13 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
-from accounts.views import refresh_access_token
+from accounts.views import refresh_access_token, allusers, change_user_status
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
 
 urlpatterns = [
     path('api/admin/', admin.site.urls),
+    path('api/admin/users/', allusers),
+    path('api/admin/users/<int:id>/', change_user_status),
     path('api/', include('activities.urls')),
     path('api/', include('test.urls')),
     path('api/', include('accounts.urls')),
